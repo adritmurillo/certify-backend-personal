@@ -1,6 +1,5 @@
 package com.certify.backend.configuracion;
 
-
 import io.jsonwebtoken.Claims;
 import io.jsonwebtoken.Jwts;
 import io.jsonwebtoken.io.Decoders;
@@ -15,15 +14,21 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.function.Function;
 
+/**
+ * Servicio encargado de generar, validar y extraer información de tokens JWT.
+ */
 @Service
 public class JwtServicio {
+
     @Value("${jwt.secret.key}")
     private String CLAVE_SECRETA;
 
-    public String generarToken(UserDetails userDetails){
+    /** Genera un token JWT con los datos del usuario. */
+    public String generarToken(UserDetails userDetails) {
         return generarToken(new HashMap<>(), userDetails);
     }
 
+    /** Genera un token JWT con claims adicionales. */
     public String generarToken(Map<String, Object> extraClaims, UserDetails userDetails) {
         return Jwts.builder()
                 .setClaims(extraClaims)
@@ -34,27 +39,26 @@ public class JwtServicio {
                 .compact();
     }
 
-    public boolean isTokenValido(String token, UserDetails userDetails){
+    /** Verifica si un token pertenece al usuario y no ha expirado. */
+    public boolean isTokenValido(String token, UserDetails userDetails) {
         final String username = extraerUsername(token);
-        return (username.equals(userDetails.getUsername())) && !isTokenExpirado(token);
-
+        return username.equals(userDetails.getUsername()) && !isTokenExpirado(token);
     }
 
-    public boolean isTokenExpirado(String token){
+    private boolean isTokenExpirado(String token) {
         return extraerExpiracion(token).before(new Date());
     }
 
-    public <T> T extraerClaim(String token, Function<Claims, T> claimsResolver) {
-        final Claims claims = extraerTodosLosClaims(token);
-        return claimsResolver.apply(claims);
+    public String extraerUsername(String token) {
+        return extraerClaim(token, Claims::getSubject);
     }
 
     private Date extraerExpiracion(String token) {
         return extraerClaim(token, Claims::getExpiration);
     }
 
-    public String extraerUsername(String token){
-        return extraerClaim(token, Claims::getSubject);
+    private <T> T extraerClaim(String token, Function<Claims, T> claimsResolver) {
+        return claimsResolver.apply(extraerTodosLosClaims(token));
     }
 
     private Claims extraerTodosLosClaims(String token) {
@@ -65,7 +69,7 @@ public class JwtServicio {
                 .getPayload();
     }
 
-    private SecretKey getSignInKey(){
+    private SecretKey getSignInKey() {
         byte[] keyBytes = Decoders.BASE64.decode(CLAVE_SECRETA);
         return Keys.hmacShaKeyFor(keyBytes);
     }

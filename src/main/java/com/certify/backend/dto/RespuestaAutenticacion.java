@@ -1,14 +1,14 @@
 package com.certify.backend.dto;
 
-import lombok.AllArgsConstructor;
-import lombok.Builder;
-import lombok.Data;
-import lombok.NoArgsConstructor;
+import lombok.*;
 
+/** Respuesta enviada tras un inicio de sesión exitoso. */
 @Data
 @Builder
 @AllArgsConstructor
 @NoArgsConstructor
 public class RespuestaAutenticacion {
+
+    /** Token JWT generado para el usuario autenticado. */
     private String token;
 }

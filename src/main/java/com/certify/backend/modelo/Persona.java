@@ -3,6 +3,7 @@ package com.certify.backend.modelo;
 import jakarta.persistence.*;
 import lombok.*;
 
+/** Representa a una persona registrada en el sistema (natural o vinculada a una empresa). */
 @Getter
 @Setter
 @Builder
@@ -11,18 +12,18 @@ import lombok.*;
 @Entity
 @Table(name = "personas")
 public class Persona {
+
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     @Column(name = "persona_id")
-    private Integer personaId;
+    private Integer personaId; // Identificador único de la persona
 
-    @Column(name = "documento", unique = true, nullable = false, length = 20)
-    private String documento;
+    @Column(unique = true, nullable = false, length = 20)
+    private String documento; // Documento de identidad (DNI, CE, etc.)
 
-    @Column(name = "nombres", nullable = false)
-    private String nombres;
+    @Column(nullable = false)
+    private String nombres; // Nombres de la persona
 
-    @Column(name = "apellidos", nullable = false)
-    private String apellidos;
-
+    @Column(nullable = false)
+    private String apellidos; // Apellidos de la persona
 }

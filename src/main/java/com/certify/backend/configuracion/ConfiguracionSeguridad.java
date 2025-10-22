@@ -10,11 +10,15 @@ import org.springframework.security.config.http.SessionCreationPolicy;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
 
-
+/**
+ * Configuración principal de seguridad HTTP.
+ * Define qué rutas son públicas, la política de sesión (sin estado) y el uso del filtro JWT.
+ */
 @Configuration
 @EnableWebSecurity
 @RequiredArgsConstructor
-public class ConfiguracionSeguridad{
+public class ConfiguracionSeguridad {
+
     private final FiltroJwt filtroJwt;
     private final AuthenticationProvider authenticationProvider;
 
@@ -26,8 +30,8 @@ public class ConfiguracionSeguridad{
                         .requestMatchers("/api/v1/auth/**").permitAll()
                         .anyRequest().authenticated()
                 )
-                .sessionManagement(session -> session
-                        .sessionCreationPolicy(SessionCreationPolicy.STATELESS)
+                .sessionManagement(session ->
+                        session.sessionCreationPolicy(SessionCreationPolicy.STATELESS)
                 )
                 .authenticationProvider(authenticationProvider)
                 .addFilterBefore(filtroJwt, UsernamePasswordAuthenticationFilter.class);

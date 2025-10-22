@@ -13,47 +13,37 @@ import org.springframework.security.core.userdetails.UsernameNotFoundException;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 
-
 /**
- * Clase de configuración central para Spring Security.
- * Define los componentes (Beans) necesarios para gestionar la autenticación
- * y la seguridad de la aplicación.
+ * Configuración principal de Spring Security:
+ * define los beans para autenticación, codificación de contraseñas y carga de usuarios.
  */
-
 @Configuration
 @RequiredArgsConstructor
 public class ConfiguracionAplicacion {
-    // Dependencias para trabajar con la base de datos de usuarios
+
     private final UsuarioRepositorio usuarioRepositorio;
 
     @Bean
-    public UserDetailsService userDetailsService(){
-        // Esta es la estrategia que usará Spring para buscar un usuario.
-        // Cuando necesite un usuario, ejecutará esta función lambda.
+    public UserDetailsService userDetailsService() {
         return username -> usuarioRepositorio.findByCorreo(username)
                 .orElseThrow(() -> new UsernameNotFoundException("Usuario no encontrado"));
     }
 
     @Bean
-    public AuthenticationProvider authenticationProvider(){
-        // Proveedor encargado de la autenticacion
+    public AuthenticationProvider authenticationProvider() {
         DaoAuthenticationProvider authProvider = new DaoAuthenticationProvider();
-        // Aca le indicamos al proveedor como buscara los usuarios
         authProvider.setUserDetailsService(userDetailsService());
-        // Y aca le indicamos al proveedor que codificador de contraseñas usar para la verificacion
         authProvider.setPasswordEncoder(passwordEncoder());
         return authProvider;
     }
 
     @Bean
-    public PasswordEncoder passwordEncoder(){
-        // Algoritmo para codificar contraseñas (BCrypt)
+    public PasswordEncoder passwordEncoder() {
         return new BCryptPasswordEncoder();
     }
 
     @Bean
-    public AuthenticationManager authenticationManager(AuthenticationConfiguration config) throws Exception{
-        // Obtiene el gestor de autenticación de Spring, necesario para procesar los inicios de sesión.
+    public AuthenticationManager authenticationManager(AuthenticationConfiguration config) throws Exception {
         return config.getAuthenticationManager();
     }
 }

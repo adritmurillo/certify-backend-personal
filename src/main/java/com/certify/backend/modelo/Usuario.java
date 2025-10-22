@@ -9,6 +9,7 @@ import org.springframework.security.core.userdetails.UserDetails;
 import java.util.Collection;
 import java.util.List;
 
+/** Representa un usuario del sistema. Implementa UserDetails para integrarse con Spring Security. */
 @Getter
 @Setter
 @Builder
@@ -17,26 +18,31 @@ import java.util.List;
 @Entity
 @Table(name = "usuario")
 public class Usuario implements UserDetails {
+
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     @Column(name = "usuario_id")
     private Integer usuarioId;
 
+    /** Información personal del usuario (vinculada 1:1 con Persona). */
     @OneToOne(cascade = CascadeType.ALL)
-    @JoinColumn(name = "persona_id", referencedColumnName = "persona_id", nullable = false, unique = true)
+    @JoinColumn(name = "persona_id", nullable = false, unique = true)
     private Persona persona;
 
-    @Column(name = "correo", unique = true, nullable = false)
+    /** Correo electrónico único, usado como nombre de usuario. */
+    @Column(unique = true, nullable = false)
     private String correo;
 
+    /** Contraseña encriptada. */
     @Column(name = "password_hash", nullable = false)
     private String contrasena;
 
+    /** Rol asignado al usuario (ADMIN, EMPLEADO, etc.). */
     @ManyToOne
-    @JoinColumn(name = "rol_id", referencedColumnName = "rol_id", nullable = false)
+    @JoinColumn(name = "rol_id", nullable = false)
     private Rol rol;
 
-    // METODOS DE USERDETAILS
+    // Métodos requeridos por la interfaz UserDetails de Spring Security
 
     @Override
     public Collection<? extends GrantedAuthority> getAuthorities() {
@@ -45,19 +51,17 @@ public class Usuario implements UserDetails {
 
     @Override
     public String getPassword() {
-        // Spring Security busca este método para obtener la contraseña.
         return contrasena;
     }
 
     @Override
-    public String getUsername(){
-        // Spring Security busca este método para obtener el nombre de usuario (nuestro correo).
+    public String getUsername() {
         return correo;
     }
 
     @Override
     public boolean isAccountNonExpired() {
-        return true;
+        return true; // Cambia según reglas de negocio
     }
 
     @Override
