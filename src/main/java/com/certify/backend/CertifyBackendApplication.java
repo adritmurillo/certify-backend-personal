@@ -3,10 +3,12 @@ package com.certify.backend;
 import com.certify.backend.modelo.EstadoRegistro;
 import com.certify.backend.modelo.Persona;
 import com.certify.backend.modelo.Rol;
+import com.certify.backend.modelo.TipoDocumento;
 import com.certify.backend.modelo.Usuario;
 import com.certify.backend.repositorio.EstadoRegistroRepositorio;
 import com.certify.backend.repositorio.PersonaRepositorio;
 import com.certify.backend.repositorio.RolRepositorio;
+import com.certify.backend.repositorio.TipoDocumentoRepositorio;
 import com.certify.backend.repositorio.UsuarioRepositorio;
 import org.springframework.boot.CommandLineRunner;
 import org.springframework.boot.SpringApplication;
@@ -46,48 +48,44 @@ public class CertifyBackendApplication {
             RolRepositorio rolRepositorio,
             PersonaRepositorio personaRepositorio,
             EstadoRegistroRepositorio estadoRegistroRepositorio,
+            TipoDocumentoRepositorio tipoDocumentoRepositorio,
             PasswordEncoder passwordEncoder
     ) {
         return args -> {
-
-            // Ejecuta solo si la tabla de roles está vacía (primera vez que corre el proyecto)
-            if (rolRepositorio.count() == 0) {
+        	System.out.println("10:");
+                System.out.println("1:");
                 System.out.println("Inicializando datos de prueba...");
 
-                // 1️. Crear rol ADMIN
-                Rol rolAdmin = Rol.builder()
-                        .nombre("ADMIN")
-                        .descripcion("Administrador con todos los permisos del sistema")
-                        .build();
-                rolRepositorio.save(rolAdmin);
+                Rol rolAdmin = rolRepositorio.findById(1).get();
+                TipoDocumento tipoDocumentoDni = tipoDocumentoRepositorio.findById(1).get();
 
-                // 2️. Crear estados de registro base
-                EstadoRegistro estadoActivo = EstadoRegistro.builder().nombre("Activa").build();
-                EstadoRegistro estadoInactivo = EstadoRegistro.builder().nombre("Inactiva").build();
-                estadoRegistroRepositorio.saveAll(List.of(estadoActivo, estadoInactivo));
 
-                // 3️. Crear persona asociada al usuario administrador
-                Persona personaAdmin = Persona.builder()
-                        .nombres("Administrador")
-                        .apellidos("del Sistema")
-                        .documento("00000001")
-                        .build();
+                try {
+                	
+                	Persona personaAdmin = Persona.builder()
+                            .tipoDocumento(tipoDocumentoDni)
+                            .nombres("Administrador")
+                            .apellidos("del Sistema")
+                            .documento("00000001")
+                            .build();
+                    personaRepositorio.save(personaAdmin);
 
-                // 4️. Crear usuario administrador con contraseña encriptada
-                Usuario usuarioAdmin = Usuario.builder()
-                        .persona(personaAdmin)
-                        .rol(rolAdmin)
-                        .correo("admin@certify.com")
-                        .contrasena(passwordEncoder.encode("123456"))
-                        .build();
+                    Usuario usuarioAdmin = Usuario.builder()
+                            .persona(personaAdmin)
+                            .rol(rolAdmin)
+                            .correo("admin@certify.com")
+                            .contrasena(passwordEncoder.encode("123456"))
+                            .build();
+                    usuarioRepositorio.save(usuarioAdmin);
+				} catch (Exception e) {
+					System.out.println(e);
+				}
 
-                usuarioRepositorio.save(usuarioAdmin);
-
-                // 5️. Mostrar credenciales por consola
-                System.out.println("Usuario administrador de prueba creado:");
+                System.out.println("✅ Usuario administrador de prueba creado:");
                 System.out.println("Correo: admin@certify.com");
                 System.out.println("Clave: 123456");
-            }
+            
         };
     }
+
 }

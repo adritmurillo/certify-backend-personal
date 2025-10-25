@@ -26,4 +26,8 @@ public class Persona {
 
     @Column(nullable = false)
     private String apellidos; // Apellidos de la persona
+    
+    @ManyToOne
+    @JoinColumn(name = "tipo_documento_id", nullable = false)
+    private TipoDocumento tipoDocumento;
 }
