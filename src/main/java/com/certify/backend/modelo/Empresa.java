@@ -6,6 +6,7 @@ import org.hibernate.annotations.CreationTimestamp;
 import org.hibernate.annotations.UpdateTimestamp;
 
 import java.sql.Timestamp;
+import java.util.List;
 
 /**
  * Entidad que representa la tabla 'empresa'.
@@ -44,8 +45,12 @@ public class Empresa {
 
     /** Usuario que registró la empresa. */
     @ManyToOne
-    @JoinColumn(name = "creado_por_usuario_id", referencedColumnName = "usuario_id", nullable = false)
+    @JoinColumn(name = "creado_por_usuario_id", nullable = true)
     private Usuario creadoPor;
+
+    @OneToMany(mappedBy = "empresa", cascade = CascadeType.ALL)
+    private List<Usuario> usuarios;
+
 
     /** Auditoría de creación. */
     @CreationTimestamp

@@ -1,15 +1,7 @@
 package com.certify.backend;
 
-import com.certify.backend.modelo.EstadoRegistro;
-import com.certify.backend.modelo.Persona;
-import com.certify.backend.modelo.Rol;
-import com.certify.backend.modelo.TipoDocumento;
-import com.certify.backend.modelo.Usuario;
-import com.certify.backend.repositorio.EstadoRegistroRepositorio;
-import com.certify.backend.repositorio.PersonaRepositorio;
-import com.certify.backend.repositorio.RolRepositorio;
-import com.certify.backend.repositorio.TipoDocumentoRepositorio;
-import com.certify.backend.repositorio.UsuarioRepositorio;
+import com.certify.backend.modelo.*;
+import com.certify.backend.repositorio.*;
 import org.springframework.boot.CommandLineRunner;
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
@@ -49,42 +41,42 @@ public class CertifyBackendApplication {
             PersonaRepositorio personaRepositorio,
             EstadoRegistroRepositorio estadoRegistroRepositorio,
             TipoDocumentoRepositorio tipoDocumentoRepositorio,
+            EmpresaRepositorio empresaRepositorio,
             PasswordEncoder passwordEncoder
     ) {
         return args -> {
-        	System.out.println("10:");
-                System.out.println("1:");
-                System.out.println("Inicializando datos de prueba...");
+            if (rolRepositorio.count() == 0) {
+                System.out.println("Creando datos de prueba iniciales...");
 
-                Rol rolAdmin = rolRepositorio.findById(1).get();
-                TipoDocumento tipoDocumentoDni = tipoDocumentoRepositorio.findById(1).get();
+                // --- 1. CREAR DATOS BASE ---
+                Rol rolAdmin = Rol.builder().nombre("ADMIN").build();
+                Rol rolAdminEmpresa = Rol.builder().nombre("Admin Empresa").build();
+                rolRepositorio.saveAll(List.of(rolAdmin, rolAdminEmpresa));
 
+                EstadoRegistro estadoActivo = EstadoRegistro.builder().nombre("Activa").build();
+                EstadoRegistro estadoInactivo = EstadoRegistro.builder().nombre("Inactivo").build();
+                EstadoRegistro estadoPendiente = EstadoRegistro.builder().nombre("Pendiente").build();
 
-                try {
-                	
-                	Persona personaAdmin = Persona.builder()
-                            .tipoDocumento(tipoDocumentoDni)
-                            .nombres("Administrador")
-                            .apellidos("del Sistema")
-                            .documento("00000001")
-                            .build();
-                    personaRepositorio.save(personaAdmin);
+                estadoRegistroRepositorio.saveAll(List.of(estadoActivo, estadoInactivo, estadoPendiente));
 
-                    Usuario usuarioAdmin = Usuario.builder()
-                            .persona(personaAdmin)
-                            .rol(rolAdmin)
-                            .correo("admin@certify.com")
-                            .contrasena(passwordEncoder.encode("123456"))
-                            .build();
-                    usuarioRepositorio.save(usuarioAdmin);
-				} catch (Exception e) {
-					System.out.println(e);
-				}
+                TipoDocumento tipoDNI = TipoDocumento.builder().descripcion("DNI").build();
+                tipoDocumentoRepositorio.save(tipoDNI);
 
-                System.out.println("✅ Usuario administrador de prueba creado:");
-                System.out.println("Correo: admin@certify.com");
-                System.out.println("Clave: 123456");
-            
+                // --- 2. CREAR SUPERADMIN ---
+                Persona personaAdmin = Persona.builder().nombres("Super").apellidos("Admin").documento("00000001").tipoDocumento(tipoDNI).build();
+                Usuario usuarioAdmin = Usuario.builder().persona(personaAdmin).rol(rolAdmin).correo("admin@certify.com").contrasena(passwordEncoder.encode("123456")).build();
+                usuarioRepositorio.save(usuarioAdmin);
+                System.out.println("✅ Usuario Superadmin de prueba creado: admin@certify.com / 123456");
+
+                // --- 3. CREAR EMPRESA DE PRUEBA Y USUARIO ASOCIADO ---
+                Empresa empresaPrueba = Empresa.builder().ruc("12345678901").razonSocial("Empresa de Prueba").correoContacto("contacto@prueba.com").estado(estadoActivo).creadoPor(usuarioAdmin).build();
+                empresaRepositorio.save(empresaPrueba);
+
+                Persona personaEmpresa = Persona.builder().nombres("Usuario").apellidos("Empresa").documento("11111111").tipoDocumento(tipoDNI).build();
+                Usuario usuarioEmpresa = Usuario.builder().persona(personaEmpresa).rol(rolAdminEmpresa).empresa(empresaPrueba).correo("empresa@certify.com").contrasena(passwordEncoder.encode("123456")).build();
+                usuarioRepositorio.save(usuarioEmpresa);
+                System.out.println("✅ Usuario Admin Empresa de prueba creado: empresa@certify.com / 123456");
+            }
         };
     }
 

@@ -1,28 +1,17 @@
 package com.certify.backend.servicio;
 
-import com.certify.backend.dto.PeticionCrearEmpresa;
+import com.certify.backend.dto.PeticionSolicitudEmpresa;
 import com.certify.backend.dto.RespuestaEmpresa;
-import com.certify.backend.modelo.Empresa;
-import com.certify.backend.modelo.EstadoRegistro;
-import com.certify.backend.modelo.Usuario;
-import com.certify.backend.repositorio.EmpresaRepositorio;
-import com.certify.backend.repositorio.EstadoRegistroRepositorio;
-import com.certify.backend.repositorio.UsuarioRepositorio;
+import com.certify.backend.modelo.*;
+import com.certify.backend.repositorio.*; // Asegúrate de importar todos los repositorios necesarios
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.core.userdetails.UsernameNotFoundException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-/**
- * Implementación del servicio encargado de gestionar la lógica
- * relacionada con la creación y administración de empresas.
- *
- * Este servicio:
- *  - Evita la creación de empresas con RUC duplicado.
- *  - Asigna automáticamente el estado "Activa" al crear una empresa.
- *  - Registra qué usuario (superadmin) realizó la creación.
- */
+import java.util.List;
+
 @Service
 @RequiredArgsConstructor
 public class EmpresaServicioImpl implements EmpresaServicio {
@@ -30,68 +19,104 @@ public class EmpresaServicioImpl implements EmpresaServicio {
     private final EmpresaRepositorio empresaRepositorio;
     private final EstadoRegistroRepositorio estadoRegistroRepositorio;
     private final UsuarioRepositorio usuarioRepositorio;
+    private final RolRepositorio rolRepositorio; // Necesario para el nuevo flujo
+    private final TipoDocumentoRepositorio tipoDocumentoRepositorio; // Necesario para el nuevo flujo
 
-    /**
-     * Crea una nueva empresa validando las reglas de negocio:
-     *  1. No permite RUC duplicado.
-     *  2. Asigna estado "Activa" por defecto.
-     *  3. Registra el usuario que la creó.
-     *
-     * @param peticion DTO con los datos necesarios para crear la empresa.
-     * @return DTO con la información de la empresa creada.
-     * @throws IllegalArgumentException si ya existe una empresa con el mismo RUC.
-     * @throws RuntimeException si el estado "Activa" no existe en la base de datos.
-     */
+    // --- NUEVOS MÉTODOS PARA EL FLUJO DE SOLICITUD Y APROBACIÓN ---
+
     @Override
     @Transactional
-    public RespuestaEmpresa crearEmpresa(PeticionCrearEmpresa peticion) {
-
-        // 1️. Verificar duplicado de RUC
-        empresaRepositorio.findByRuc(peticion.getRuc()).ifPresent(empresa -> {
-            throw new IllegalArgumentException("La empresa ya existe: " + peticion.getRuc());
+    public RespuestaEmpresa solicitarRegistro(PeticionSolicitudEmpresa peticion) {
+        // 1. Validar duplicados (RUC y correo del admin)
+        empresaRepositorio.findByRuc(peticion.getRuc()).ifPresent(e -> {
+            throw new IllegalArgumentException("Ya existe una empresa con el RUC: " + peticion.getRuc());
+        });
+        usuarioRepositorio.findByCorreo(peticion.getCorreoAdmin()).ifPresent(u -> {
+            throw new IllegalArgumentException("Ya existe un usuario con el correo: " + peticion.getCorreoAdmin());
         });
 
-        // 2️. Obtener el estado "Activa"
-        EstadoRegistro estadoActivo = estadoRegistroRepositorio.findByNombre("Activa")
-                .orElseThrow(() -> new RuntimeException("Error: Estado 'Activa' no encontrado en la base de datos."));
+        // 2. Obtener entidades base
+        EstadoRegistro estadoPendiente = estadoRegistroRepositorio.findByNombre("Pendiente")
+                .orElseThrow(() -> new RuntimeException("Error: Estado 'Pendiente' no encontrado."));
+        Rol rolAdminEmpresa = rolRepositorio.findByNombre("Admin Empresa")
+                .orElseThrow(() -> new RuntimeException("Error: Rol 'Admin Empresa' no encontrado."));
+        TipoDocumento tipoDNI = tipoDocumentoRepositorio.findByDescripcion("DNI")
+                .orElseThrow(() -> new RuntimeException("Error: Tipo de documento 'DNI' no encontrado."));
 
-        // 3️. Obtener el usuario autenticado (superadmin)
-        Usuario superAdmin = obtenerUsuarioAutenticado();
-
-        // 4️. Construir y guardar la nueva empresa
+        // 3. Crear la nueva empresa (aún sin usuario creador)
         Empresa nuevaEmpresa = Empresa.builder()
                 .ruc(peticion.getRuc())
                 .razonSocial(peticion.getRazonSocial())
                 .correoContacto(peticion.getCorreoContacto())
-                .estado(estadoActivo)
-                .creadoPor(superAdmin)
+                .estado(estadoPendiente)
                 .build();
 
+        // 4. Crear la persona y el usuario administrador para esa empresa
+        Persona adminPersona = Persona.builder()
+                .nombres(peticion.getNombresAdmin())
+                .apellidos(peticion.getApellidosAdmin())
+                .documento(peticion.getDocumentoAdmin())
+                .tipoDocumento(tipoDNI)
+                .build();
+
+        Usuario adminUsuario = Usuario.builder()
+                .persona(adminPersona) // Se guardará en cascada
+                .correo(peticion.getCorreoAdmin())
+                .rol(rolAdminEmpresa)
+                .empresa(nuevaEmpresa) // Vinculamos el usuario a la empresa
+                // Sin contraseña por ahora, hasta el flujo de activación
+                .build();
+
+        // 5. Guardar la empresa (la cascada guardará la persona y el usuario)
+        // OJO: Necesitaremos añadir la cascada en la entidad Empresa
         Empresa empresaGuardada = empresaRepositorio.save(nuevaEmpresa);
 
-        // 5️. Devolver la respuesta en formato DTO
-        return new RespuestaEmpresa(
-                empresaGuardada.getEmpresaId(),
-                empresaGuardada.getRuc(),
-                empresaGuardada.getRazonSocial(),
-                empresaGuardada.getCorreoContacto(),
-                empresaGuardada.getLogoUrl(),
-                empresaGuardada.getEstado().getNombre(),
-                empresaGuardada.getFechaCreacion()
-        );
+        return mapearARespuesta(empresaGuardada);
     }
 
-    /**
-     * Obtiene el usuario autenticado actualmente en el contexto de seguridad.
-     * Spring Security almacena el correo del usuario en el Authentication principal.
-     *
-     * @return Usuario autenticado (superadmin).
-     * @throws UsernameNotFoundException si el usuario no existe en la base de datos.
-     */
+    @Override
+    @Transactional
+    public RespuestaEmpresa aprobarSolicitud(Integer empresaId) {
+        // 1. Obtener la empresa y el estado "Activo"
+        Empresa empresaPendiente = empresaRepositorio.findById(empresaId)
+                .orElseThrow(() -> new RuntimeException("Empresa no encontrada con ID: " + empresaId));
+
+        EstadoRegistro estadoActivo = estadoRegistroRepositorio.findByNombre("Activa")
+                .orElseThrow(() -> new RuntimeException("Error: Estado 'Activo' no encontrado."));
+
+        // 2. Actualizar el estado y guardar
+        empresaPendiente.setEstado(estadoActivo);
+        Empresa empresaAprobada = empresaRepositorio.save(empresaPendiente);
+
+        // Aquí iría la lógica para un posible envio de activacion de cuenta mediante gmail
+
+        return mapearARespuesta(empresaAprobada);
+    }
+
+    // --- MÉTODOS PRIVADOS DE AYUDA ---
+
     private Usuario obtenerUsuarioAutenticado() {
         String correoSuperAdmin = SecurityContextHolder.getContext().getAuthentication().getName();
-
         return usuarioRepositorio.findByCorreo(correoSuperAdmin)
                 .orElseThrow(() -> new UsernameNotFoundException("Usuario no encontrado en el contexto de seguridad."));
+    }
+
+    private RespuestaEmpresa mapearARespuesta(Empresa empresa) {
+        return RespuestaEmpresa.builder()
+                .empresaId(empresa.getEmpresaId())
+                .ruc(empresa.getRuc())
+                .razonSocial(empresa.getRazonSocial())
+                .correoContacto(empresa.getCorreoContacto())
+                .logoUrl(empresa.getLogoUrl())
+                .estadoNombre(empresa.getEstado() != null ? empresa.getEstado().getNombre() : "N/A")
+                .fechaCreacion(empresa.getFechaCreacion())
+                .build();
+    }
+    @Override
+    public List<RespuestaEmpresa> listarTodas() {
+        return empresaRepositorio.findAll()
+                .stream()
+                .map(this::mapearARespuesta) // Reutilizamos nuestro método de mapeo
+                .toList();
     }
 }

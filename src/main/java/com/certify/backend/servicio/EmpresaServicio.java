@@ -1,13 +1,15 @@
 package com.certify.backend.servicio;
 
-import com.certify.backend.dto.PeticionCrearEmpresa;
+import com.certify.backend.dto.PeticionSolicitudEmpresa;
 import com.certify.backend.dto.RespuestaEmpresa;
 
+import java.util.List;
+
 public interface EmpresaServicio {
-    // Este metodo nos ayudara a crear una nueva empresa
 
-    RespuestaEmpresa crearEmpresa(PeticionCrearEmpresa peticion);
+    RespuestaEmpresa solicitarRegistro(PeticionSolicitudEmpresa peticion);
 
-    // Dentro de esta interfaz podemos poner mas metodos como
-    // la busqueda de empresa por id, actualizarla, etc.
+    RespuestaEmpresa aprobarSolicitud(Integer empresaId);
+
+    List<RespuestaEmpresa> listarTodas();
 }

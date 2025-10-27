@@ -42,6 +42,10 @@ public class Usuario implements UserDetails {
     @JoinColumn(name = "rol_id", nullable = false)
     private Rol rol;
 
+    @ManyToOne
+    @JoinColumn(name = "empresa_id")
+    private Empresa empresa;
+
     // Métodos requeridos por la interfaz UserDetails de Spring Security
 
     @Override

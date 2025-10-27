@@ -3,11 +3,15 @@ package com.certify.backend.servicio;
 import java.util.List;
 import java.util.Optional;
 
+import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Autowired;
 
 import com.certify.backend.modelo.TipoDocumento;
 import com.certify.backend.repositorio.TipoDocumentoRepositorio;
+import org.springframework.stereotype.Service;
 
+@Service
+@RequiredArgsConstructor
 public class TipoDocumentoService implements CRUDService<TipoDocumento, Integer>{
 
 	@Autowired
@@ -40,7 +44,7 @@ public class TipoDocumentoService implements CRUDService<TipoDocumento, Integer>
 	@Override
 	public Optional<TipoDocumento> findById(Integer id) {
 		// TODO Auto-generated method stub
-		return Optional.empty();
+		return repositorio.findById(id);
 	}
 
 }
