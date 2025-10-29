@@ -1,5 +1,6 @@
 package com.certify.backend.repositorio;
 
+import com.certify.backend.modelo.Empresa;
 import com.certify.backend.modelo.Usuario;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.stereotype.Repository;
@@ -26,4 +27,5 @@ public interface UsuarioRepositorio extends JpaRepository<Usuario, Integer> {
      * @return un Optional que contiene el usuario si existe, o vacío si no se encuentra.
      */
     Optional<Usuario> findByCorreo(String correo);
+    Optional<Usuario> findByEmpresa(Empresa empresa);
 }

@@ -1,12 +1,15 @@
 package com.certify.backend.servicio;
 
+import com.certify.backend.dto.PeticionActualizarEmpresa;
 import com.certify.backend.dto.PeticionSolicitudEmpresa;
 import com.certify.backend.dto.RespuestaEmpresa;
 import com.certify.backend.modelo.*;
-import com.certify.backend.repositorio.*; // Asegúrate de importar todos los repositorios necesarios
+import com.certify.backend.repositorio.*;
+import com.certify.backend.util.GeneradorContrasena;
 import lombok.RequiredArgsConstructor;
+import org.springframework.security.core.Authentication; // Asegúrate de tener estos imports
 import org.springframework.security.core.context.SecurityContextHolder;
-import org.springframework.security.core.userdetails.UsernameNotFoundException;
+import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -19,15 +22,16 @@ public class EmpresaServicioImpl implements EmpresaServicio {
     private final EmpresaRepositorio empresaRepositorio;
     private final EstadoRegistroRepositorio estadoRegistroRepositorio;
     private final UsuarioRepositorio usuarioRepositorio;
-    private final RolRepositorio rolRepositorio; // Necesario para el nuevo flujo
-    private final TipoDocumentoRepositorio tipoDocumentoRepositorio; // Necesario para el nuevo flujo
-
-    // --- NUEVOS MÉTODOS PARA EL FLUJO DE SOLICITUD Y APROBACIÓN ---
+    private final RolRepositorio rolRepositorio;
+    private final TipoDocumentoRepositorio tipoDocumentoRepositorio;
+    private final EmailServicio emailServicio;
+    private final PasswordEncoder passwordEncoder;
 
     @Override
     @Transactional
     public RespuestaEmpresa solicitarRegistro(PeticionSolicitudEmpresa peticion) {
-        // 1. Validar duplicados (RUC y correo del admin)
+        System.out.println("\n--- DEBUG: Iniciando solicitarRegistro ---");
+        // ... (Validaciones de RUC y correo se mantienen)
         empresaRepositorio.findByRuc(peticion.getRuc()).ifPresent(e -> {
             throw new IllegalArgumentException("Ya existe una empresa con el RUC: " + peticion.getRuc());
         });
@@ -35,7 +39,7 @@ public class EmpresaServicioImpl implements EmpresaServicio {
             throw new IllegalArgumentException("Ya existe un usuario con el correo: " + peticion.getCorreoAdmin());
         });
 
-        // 2. Obtener entidades base
+        // ... (Obtención de entidades base se mantiene)
         EstadoRegistro estadoPendiente = estadoRegistroRepositorio.findByNombre("Pendiente")
                 .orElseThrow(() -> new RuntimeException("Error: Estado 'Pendiente' no encontrado."));
         Rol rolAdminEmpresa = rolRepositorio.findByNombre("Admin Empresa")
@@ -43,7 +47,6 @@ public class EmpresaServicioImpl implements EmpresaServicio {
         TipoDocumento tipoDNI = tipoDocumentoRepositorio.findByDescripcion("DNI")
                 .orElseThrow(() -> new RuntimeException("Error: Tipo de documento 'DNI' no encontrado."));
 
-        // 3. Crear la nueva empresa (aún sin usuario creador)
         Empresa nuevaEmpresa = Empresa.builder()
                 .ruc(peticion.getRuc())
                 .razonSocial(peticion.getRazonSocial())
@@ -51,7 +54,6 @@ public class EmpresaServicioImpl implements EmpresaServicio {
                 .estado(estadoPendiente)
                 .build();
 
-        // 4. Crear la persona y el usuario administrador para esa empresa
         Persona adminPersona = Persona.builder()
                 .nombres(peticion.getNombresAdmin())
                 .apellidos(peticion.getApellidosAdmin())
@@ -60,16 +62,29 @@ public class EmpresaServicioImpl implements EmpresaServicio {
                 .build();
 
         Usuario adminUsuario = Usuario.builder()
-                .persona(adminPersona) // Se guardará en cascada
+                .persona(adminPersona)
                 .correo(peticion.getCorreoAdmin())
                 .rol(rolAdminEmpresa)
-                .empresa(nuevaEmpresa) // Vinculamos el usuario a la empresa
-                // Sin contraseña por ahora, hasta el flujo de activación
+                .empresa(nuevaEmpresa)
                 .build();
+        System.out.println("DEBUG: Creado objeto Empresa en memoria: " + nuevaEmpresa.getRazonSocial());
+        System.out.println("DEBUG: Creado objeto Usuario en memoria: " + adminUsuario.getCorreo());
+        System.out.println("DEBUG: Asignando usuario a la empresa...");
 
-        // 5. Guardar la empresa (la cascada guardará la persona y el usuario)
-        // OJO: Necesitaremos añadir la cascada en la entidad Empresa
+        // ========== CORRECCIÓN #1: Asegurar la relación bidireccional ==========
+        // Esto garantiza que la conexión se guarde correctamente en la base de datos.
+        nuevaEmpresa.setUsuarios(List.of(adminUsuario));
+
+        // Verificamos la relación antes de guardar
+        if (nuevaEmpresa.getUsuarios() != null && !nuevaEmpresa.getUsuarios().isEmpty()) {
+            System.out.println("DEBUG: ¡ÉXITO! La lista de usuarios en la empresa NO está vacía. Contiene: " + nuevaEmpresa.getUsuarios().get(0).getCorreo());
+        } else {
+            System.err.println("DEBUG: ¡ERROR! La lista de usuarios en la empresa ESTÁ vacía ANTES de guardar.");
+        }
+
+        System.out.println("DEBUG: Guardando la empresa en la base de datos...");
         Empresa empresaGuardada = empresaRepositorio.save(nuevaEmpresa);
+        System.out.println("--- DEBUG: Finalizado solicitarRegistro para empresa ID: " + empresaGuardada.getEmpresaId() + " ---\n");
 
         return mapearARespuesta(empresaGuardada);
     }
@@ -77,28 +92,101 @@ public class EmpresaServicioImpl implements EmpresaServicio {
     @Override
     @Transactional
     public RespuestaEmpresa aprobarSolicitud(Integer empresaId) {
-        // 1. Obtener la empresa y el estado "Activo"
+        System.out.println("\n--- DEBUG: Iniciando aprobarSolicitud para Empresa ID: " + empresaId + " ---");
         Empresa empresaPendiente = empresaRepositorio.findById(empresaId)
                 .orElseThrow(() -> new RuntimeException("Empresa no encontrada con ID: " + empresaId));
+        System.out.println("DEBUG: Empresa encontrada: " + empresaPendiente.getRazonSocial());
+
+        if (empresaPendiente.getUsuarios() != null && !empresaPendiente.getUsuarios().isEmpty()) {
+            System.out.println("DEBUG: ¡ÉXITO! La lista de usuarios de la empresa NO está vacía. Contiene " + empresaPendiente.getUsuarios().size() + " usuario(s).");
+            System.out.println("DEBUG: Usuario en la lista: " + empresaPendiente.getUsuarios().get(0).getCorreo());
+        } else {
+            // Si ves este mensaje, aquí está el núcleo del problema.
+            System.err.println("DEBUG: ¡ERROR! La lista de usuarios de la empresa ESTÁ vacía o es nula después de recuperarla de la BD.");
+        }
+
+        if (!"Pendiente".equals(empresaPendiente.getEstado().getNombre())) {
+            throw new IllegalStateException("Solo se pueden aprobar empresas en estado 'Pendiente'");
+        }
+
+        // ========== CORRECCIÓN #2: Usar la relación del objeto en lugar del repositorio ==========
+        // Esta es la forma más segura y correcta de encontrar el usuario asociado.
+        Usuario adminEmpresa = empresaPendiente.getUsuarios().stream()
+                .filter(u -> "Admin Empresa".equals(u.getRol().getNombre()))
+                .findFirst()
+                .orElseThrow(() -> new RuntimeException("No se encontró el usuario administrador para la empresa"));
+
+        String contrasenaTemporal = GeneradorContrasena.generarTemporal();
+        adminEmpresa.setContrasena(passwordEncoder.encode(contrasenaTemporal));
 
         EstadoRegistro estadoActivo = estadoRegistroRepositorio.findByNombre("Activa")
-                .orElseThrow(() -> new RuntimeException("Error: Estado 'Activo' no encontrado."));
+                .orElseThrow(() -> new RuntimeException("Estado 'Activa' no encontrado."));
 
-        // 2. Actualizar el estado y guardar
         empresaPendiente.setEstado(estadoActivo);
         Empresa empresaAprobada = empresaRepositorio.save(empresaPendiente);
 
-        // Aquí iría la lógica para un posible envio de activacion de cuenta mediante gmail
+        System.out.println("DEBUG: Empresa aprobada y guardada. Procediendo a enviar email...");
 
+        try {
+            emailServicio.enviarCredencialesTemporales(
+                    adminEmpresa.getCorreo(),
+                    adminEmpresa.getCorreo(),
+                    contrasenaTemporal
+            );
+            System.out.println("DEBUG: Email enviado exitosamente a " + adminEmpresa.getCorreo());
+        } catch (Exception e) {
+            System.err.println("⚠️ Error al enviar email: " + e.getMessage());
+        }
+
+        System.out.println("--- DEBUG: Finalizado aprobarSolicitud --- \n");
         return mapearARespuesta(empresaAprobada);
     }
 
-    // --- MÉTODOS PRIVADOS DE AYUDA ---
+    // --- El resto de tus métodos CRUD que ya estaban bien ---
 
-    private Usuario obtenerUsuarioAutenticado() {
-        String correoSuperAdmin = SecurityContextHolder.getContext().getAuthentication().getName();
-        return usuarioRepositorio.findByCorreo(correoSuperAdmin)
-                .orElseThrow(() -> new UsernameNotFoundException("Usuario no encontrado en el contexto de seguridad."));
+    @Override
+    public List<RespuestaEmpresa> listarTodas() {
+        return empresaRepositorio.findAll().stream().map(this::mapearARespuesta).toList();
+    }
+
+    @Override
+    public RespuestaEmpresa obtenerPorId(Integer empresaId) {
+        Empresa empresa = empresaRepositorio.findById(empresaId)
+                .orElseThrow(() -> new RuntimeException("Empresa no encontrada con ID: " + empresaId));
+        return mapearARespuesta(empresa);
+    }
+
+    @Override
+    public List<RespuestaEmpresa> listarConFiltros(String nombre, String estado) {
+        return empresaRepositorio.buscarConFiltros(nombre, estado)
+                .stream().map(this::mapearARespuesta).toList();
+    }
+
+    @Override
+    @Transactional
+    public RespuestaEmpresa actualizarEmpresa(Integer empresaId, PeticionActualizarEmpresa peticion) {
+        Empresa empresa = empresaRepositorio.findById(empresaId)
+                .orElseThrow(() -> new RuntimeException("Empresa no encontrada con ID: " + empresaId));
+        empresa.setRazonSocial(peticion.getRazonSocial());
+        empresa.setCorreoContacto(peticion.getCorreoContacto());
+        return mapearARespuesta(empresaRepositorio.save(empresa));
+    }
+
+    @Override
+    @Transactional
+    public RespuestaEmpresa cambiarEstado(Integer empresaId, String nuevoEstado) {
+        Empresa empresa = empresaRepositorio.findById(empresaId)
+                .orElseThrow(() -> new RuntimeException("Empresa no encontrada con ID: " + empresaId));
+        EstadoRegistro estado = estadoRegistroRepositorio.findByNombre(nuevoEstado)
+                .orElseThrow(() -> new RuntimeException("Estado no encontrado: " + nuevoEstado));
+        empresa.setEstado(estado);
+        return mapearARespuesta(empresaRepositorio.save(empresa));
+    }
+
+    @Override
+    @Transactional
+    public void eliminarEmpresa(Integer empresaId) {
+        cambiarEstado(empresaId, "Inactivo");
     }
 
     private RespuestaEmpresa mapearARespuesta(Empresa empresa) {
@@ -111,12 +199,5 @@ public class EmpresaServicioImpl implements EmpresaServicio {
                 .estadoNombre(empresa.getEstado() != null ? empresa.getEstado().getNombre() : "N/A")
                 .fechaCreacion(empresa.getFechaCreacion())
                 .build();
-    }
-    @Override
-    public List<RespuestaEmpresa> listarTodas() {
-        return empresaRepositorio.findAll()
-                .stream()
-                .map(this::mapearARespuesta) // Reutilizamos nuestro método de mapeo
-                .toList();
     }
 }

@@ -34,7 +34,7 @@ public class Usuario implements UserDetails {
     private String correo;
 
     /** Contraseña encriptada. */
-    @Column(name = "password_hash", nullable = false)
+    @Column(name = "password_hash", nullable = true)
     private String contrasena;
 
     /** Rol asignado al usuario (ADMIN, EMPLEADO, etc.). */

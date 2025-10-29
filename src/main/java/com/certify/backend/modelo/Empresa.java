@@ -48,7 +48,7 @@ public class Empresa {
     @JoinColumn(name = "creado_por_usuario_id", nullable = true)
     private Usuario creadoPor;
 
-    @OneToMany(mappedBy = "empresa", cascade = CascadeType.ALL)
+    @OneToMany(mappedBy = "empresa", cascade = CascadeType.ALL, fetch = FetchType.EAGER)
     private List<Usuario> usuarios;
 
 
