@@ -22,6 +22,7 @@ public class RespuestaParticipante {
     private String empresaNombre;
     private String areaProyecto;
     private String periodoEvento;
+    private String estadoNombre;
     private Timestamp fechaCreacion;
 
 

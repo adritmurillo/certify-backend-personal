@@ -88,7 +88,7 @@ public class EmpresaControlador {
     // SUPERADMIN PUEDE MODIFICAR CUALQUIER EMPRESA
 
     @PutMapping("/{empresaId}")
-    @PreAuthorize("hasAnyAuthority('ADMIN', 'Admin Empresa')")
+    @PreAuthorize("hasAnyAuthority('ADMIN')")
     public ResponseEntity<RespuestaEmpresa> actualizarEmpresa(
             @PathVariable Integer empresaId,
             @Valid @RequestBody PeticionActualizarEmpresa peticion

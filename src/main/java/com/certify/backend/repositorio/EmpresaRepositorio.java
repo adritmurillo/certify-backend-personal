@@ -22,8 +22,8 @@ public interface EmpresaRepositorio extends JpaRepository<Empresa, Integer> {
 
 
     @Query("SELECT e FROM Empresa e WHERE " +
-            "e.estado.nombre != 'Archivado' AND " + // --- FILTRO PARA SOFT DELETE ---
-            "(:nombre IS NULL OR LOWER(e.razonSocial) LIKE LOWER(CONCAT('%', :nombre, '%'))) AND " +
+            "e.estado.nombre <> 'Archivado' AND " +
+            "(:nombre IS NULL OR e.razonSocial ILIKE CONCAT('%', :nombre, '%')) AND " +
             "(:estado IS NULL OR e.estado.nombre = :estado)")
     List<Empresa> buscarConFiltros(
             @Param("nombre") String nombre,
