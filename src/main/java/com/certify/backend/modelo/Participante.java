@@ -6,6 +6,7 @@ import lombok.*;
 import org.hibernate.annotations.CreationTimestamp;
 
 import java.sql.Timestamp;
+import java.time.LocalDate;
 
 @Getter
 @Setter
@@ -23,8 +24,15 @@ public class Participante {
     @Column(name = "correo_adicional")
     private String correoAdicional;
 
-    @Column(name = "periodo_evento", nullable = false)
-    private String periodoEvento;
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "evento_curso_id", nullable = false)
+    private EventoCurso eventoCurso;
+
+    @Column(name = "fecha_inicio")
+    private LocalDate fechaInicio;
+
+    @Column(name = "fecha_fin")
+    private LocalDate fechaFin;
 
     // Aca abajo tenemos a las relaciones con otras entidades
 

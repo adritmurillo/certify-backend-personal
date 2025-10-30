@@ -9,12 +9,13 @@ import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
+import java.time.LocalDate;
+
 @Data
 @Builder
 @AllArgsConstructor
 @NoArgsConstructor
 public class PeticionCrearParticipante {
-    // Primero se pone los datos de la persona
     @NotBlank(message = "Los nombres son obligatorios.")
     private String nombres;
 
@@ -22,9 +23,7 @@ public class PeticionCrearParticipante {
     private String apellidos;
 
     @NotBlank(message = "El documento es obligatorio")
-    @Size(min = 8, max = 8, message = "El DNI debe tener 8 digitos")
-    // Este seria para un DNI peruano, si se utilizara otro tipo de documento
-    // la logica seria diferente como el de un pasaporte
+    @Size(min = 8, max = 8, message = "El DNI debe tener 8 dígitos")
     private String documento;
 
     @NotNull(message = "El tipo de documento es obligatorio")
@@ -32,10 +31,12 @@ public class PeticionCrearParticipante {
 
     @NotBlank(message = "El correo es obligatorio")
     @Email(message = "Debe ser un formato de correo válido")
-    private String correo; // Este correo se puede guardar en correo_adicional
+    private String correo; // Este correo se guarda en correo_adicional
 
-    // Datos del participante
+    @NotNull(message = "El ID del Área/Proyecto es obligatorio.")
+    private Integer eventoCursoId;
 
-    @NotBlank(message = "El periodo/evento es obligatorio")
-    private String periodoEvento;
+    private LocalDate fechaInicio;
+
+    private LocalDate fechaFin;
 }

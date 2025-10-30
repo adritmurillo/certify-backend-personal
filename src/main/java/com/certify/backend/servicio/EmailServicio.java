@@ -18,9 +18,7 @@ public class EmailServicio {
     @Value("${app.nombre}")
     private String appNombre;
 
-    /**
-     * Envía un email con credenciales temporales al admin de una empresa.
-     */
+
     public void enviarCredencialesTemporales(String destinatario, String correo, String contrasenaTemporal) {
         SimpleMailMessage mensaje = new SimpleMailMessage();
         mensaje.setFrom(fromEmail);
@@ -40,10 +38,8 @@ public class EmailServicio {
             Tus credenciales de acceso son:
             
             📧 Correo: %s
-            🔑 Contraseña temporal: %s
-            
-            ⚠️ IMPORTANTE: Por seguridad, debes cambiar tu contraseña en tu primer inicio de sesión.
-            
+            🔑 Contraseña: %s
+                        
             Puedes acceder al sistema en: https://certify.com/login
             
             Si no solicitaste este acceso, por favor ignora este mensaje.

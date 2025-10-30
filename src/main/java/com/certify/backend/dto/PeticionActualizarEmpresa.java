@@ -8,10 +8,7 @@ import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
-/**
- * DTO para actualizar datos modificables de una empresa.
- * Solo incluye campos que pueden ser editados (RUC es inmutable).
- */
+
 @Data
 @Builder
 @AllArgsConstructor

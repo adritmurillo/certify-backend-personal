@@ -3,6 +3,7 @@ package com.certify.backend.servicio;
 import com.certify.backend.dto.PeticionCrearParticipante;
 import com.certify.backend.dto.RespuestaParticipante;
 import com.certify.backend.modelo.*;
+import com.certify.backend.repositorio.EventoCursoRepositorio;
 import com.certify.backend.repositorio.ParticipanteRepositorio;
 import com.certify.backend.repositorio.TipoDocumentoRepositorio;
 import com.certify.backend.repositorio.UsuarioRepositorio;
@@ -22,13 +23,18 @@ public class ParticipanteServicioImpl implements ParticipanteServicio{
     private final ParticipanteRepositorio participanteRepositorio;
     private final UsuarioRepositorio usuarioRepositorio;
     private final TipoDocumentoRepositorio tipoDocumentoRepositorio;
+    private final EventoCursoRepositorio eventoCursoRepositorio;
 
     @Override
-    @Transactional // Operacion atomica, o todo o nada
+    @Transactional
     public RespuestaParticipante crearParticipante(PeticionCrearParticipante peticion){
-        participanteRepositorio.findByPersonaDocumentoAndPeriodoEvento(peticion.getDocumento(), peticion.getPeriodoEvento())
+
+        EventoCurso evento = eventoCursoRepositorio.findById(peticion.getEventoCursoId())
+                .orElseThrow(() -> new RuntimeException("El Área/Proyecto con ID: " + peticion.getEventoCursoId() + " no existe."));
+
+        participanteRepositorio.findByPersonaDocumentoAndEventoCurso(peticion.getDocumento(), evento)
                 .ifPresent(p -> {
-                    throw new IllegalArgumentException("El participante con documento: "+ peticion.getDocumento() + " ya se encuentra en el periodo/evento");
+                    throw new IllegalArgumentException("El participante con documento: "+ peticion.getDocumento() + " ya se encuentra en esta Área/Proyecto");
                 });
 
         TipoDocumento tipoDocumento = tipoDocumentoRepositorio.findById(peticion.getTipoDocumentoId())
@@ -47,25 +53,42 @@ public class ParticipanteServicioImpl implements ParticipanteServicio{
                 .documento(peticion.getDocumento())
                 .tipoDocumento(tipoDocumento)
                 .build();
-        Participante nuevaParticipante = Participante.builder()
+
+
+        Participante nuevoParticipante = Participante.builder()
                 .persona(nuevaPersona)
                 .empresa(empresaDelUsuario)
-                .periodoEvento(peticion.getPeriodoEvento())
+                .eventoCurso(evento)
                 .correoAdicional(peticion.getCorreo())
                 .creadoPor(usuarioCreador)
+                .fechaInicio(peticion.getFechaInicio())
+                .fechaFin(peticion.getFechaFin())
                 .build();
 
-        Participante participanteGuardado = participanteRepositorio.save(nuevaParticipante);
+        Participante participanteGuardado = participanteRepositorio.save(nuevoParticipante);
 
         return RespuestaParticipante.builder()
+                // --- Datos para la tabla ---
                 .participanteId(participanteGuardado.getParticipanteId())
                 .nombreCompleto(participanteGuardado.getPersona().getNombres() + " " + participanteGuardado.getPersona().getApellidos())
                 .documento(participanteGuardado.getPersona().getDocumento())
-                .periodoEvento(participanteGuardado.getPeriodoEvento())
+                .correo(participanteGuardado.getCorreoAdicional()) // <-- CORREGIDO
                 .empresaNombre(participanteGuardado.getEmpresa().getRazonSocial())
+                .areaProyecto(participanteGuardado.getEventoCurso().getNombre()) // <-- CORREGIDO
+                .periodoEvento(participanteGuardado.getFechaInicio() + " al " + participanteGuardado.getFechaFin()) // <-- CORREGIDO
                 .fechaCreacion(participanteGuardado.getFechaCreacion())
+
+                // --- Datos para el formulario de "Editar" ---
+                .nombres(participanteGuardado.getPersona().getNombres())
+                .apellidos(participanteGuardado.getPersona().getApellidos())
+                .tipoDocumentoId(participanteGuardado.getPersona().getTipoDocumento().getTipoDocumentoId()) // Asume que el getter se llama así
+                .eventoCursoId(participanteGuardado.getEventoCurso().getEventoCursoId())
+                .fechaInicio(participanteGuardado.getFechaInicio())
+                .fechaFin(participanteGuardado.getFechaFin())
                 .build();
     }
+
+    // --- El resto de métodos de CRUDService se mantienen igual ---
 
     @Override
     public Participante save(Participante entity) {

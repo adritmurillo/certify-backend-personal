@@ -24,16 +24,6 @@ public class CertifyBackendApplication {
         SpringApplication.run(CertifyBackendApplication.class, args);
     }
 
-    /**
-     * Crea datos iniciales de prueba si la base de datos está vacía.
-     *
-     * Este método:
-     *  - Crea el rol ADMIN (si no existe).
-     *  - Crea los estados "Activa" e "Inactiva".
-     *  - Crea un usuario administrador con correo "admin@certify.com" y contraseña "123456".
-     *
-     *  Solo se ejecuta una vez, al inicio, si no hay roles registrados.
-     */
     @Bean
     public CommandLineRunner commandLineRunner(
             UsuarioRepositorio usuarioRepositorio,
@@ -42,6 +32,7 @@ public class CertifyBackendApplication {
             EstadoRegistroRepositorio estadoRegistroRepositorio,
             TipoDocumentoRepositorio tipoDocumentoRepositorio,
             EmpresaRepositorio empresaRepositorio,
+            EventoCursoRepositorio eventoCursoRepositorio, // <-- 1. INYECTA EL NUEVO REPOSITORIO
             PasswordEncoder passwordEncoder
     ) {
         return args -> {
@@ -76,6 +67,15 @@ public class CertifyBackendApplication {
                 Usuario usuarioEmpresa = Usuario.builder().persona(personaEmpresa).rol(rolAdminEmpresa).empresa(empresaPrueba).correo("empresa@certify.com").contrasena(passwordEncoder.encode("123456")).build();
                 usuarioRepositorio.save(usuarioEmpresa);
                 System.out.println("✅ Usuario Admin Empresa de prueba creado: empresa@certify.com / 123456");
+
+                // --- 4. CREAR ÁREAS/PROYECTOS DE PRUEBA (EVENTO CURSO) ---  <-- 2. AGREGA ESTE BLOQUE
+                System.out.println("Creando Áreas/Proyectos de prueba...");
+                EventoCurso dev = EventoCurso.builder().nombre("Desarrollo de Software").estado(estadoActivo).empresa(empresaPrueba).creadoPor(usuarioEmpresa).build();
+                EventoCurso it = EventoCurso.builder().nombre("Soporte de TI").estado(estadoActivo).empresa(empresaPrueba).creadoPor(usuarioEmpresa).build();
+                EventoCurso data = EventoCurso.builder().nombre("Análisis de Datos").estado(estadoActivo).empresa(empresaPrueba).creadoPor(usuarioEmpresa).build();
+
+                eventoCursoRepositorio.saveAll(List.of(dev, it, data));
+                System.out.println("✅ Áreas/Proyectos de prueba creados.");
             }
         };
     }

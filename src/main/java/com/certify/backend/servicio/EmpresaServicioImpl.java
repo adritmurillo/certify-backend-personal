@@ -70,9 +70,6 @@ public class EmpresaServicioImpl implements EmpresaServicio {
         System.out.println("DEBUG: Creado objeto Empresa en memoria: " + nuevaEmpresa.getRazonSocial());
         System.out.println("DEBUG: Creado objeto Usuario en memoria: " + adminUsuario.getCorreo());
         System.out.println("DEBUG: Asignando usuario a la empresa...");
-
-        // ========== CORRECCIÓN #1: Asegurar la relación bidireccional ==========
-        // Esto garantiza que la conexión se guarde correctamente en la base de datos.
         nuevaEmpresa.setUsuarios(List.of(adminUsuario));
 
         // Verificamos la relación antes de guardar
@@ -101,7 +98,7 @@ public class EmpresaServicioImpl implements EmpresaServicio {
             System.out.println("DEBUG: ¡ÉXITO! La lista de usuarios de la empresa NO está vacía. Contiene " + empresaPendiente.getUsuarios().size() + " usuario(s).");
             System.out.println("DEBUG: Usuario en la lista: " + empresaPendiente.getUsuarios().get(0).getCorreo());
         } else {
-            // Si ves este mensaje, aquí está el núcleo del problema.
+            // Si ves este mensaje, es porque hay un problema
             System.err.println("DEBUG: ¡ERROR! La lista de usuarios de la empresa ESTÁ vacía o es nula después de recuperarla de la BD.");
         }
 
@@ -109,8 +106,6 @@ public class EmpresaServicioImpl implements EmpresaServicio {
             throw new IllegalStateException("Solo se pueden aprobar empresas en estado 'Pendiente'");
         }
 
-        // ========== CORRECCIÓN #2: Usar la relación del objeto en lugar del repositorio ==========
-        // Esta es la forma más segura y correcta de encontrar el usuario asociado.
         Usuario adminEmpresa = empresaPendiente.getUsuarios().stream()
                 .filter(u -> "Admin Empresa".equals(u.getRol().getNombre()))
                 .findFirst()
@@ -142,7 +137,7 @@ public class EmpresaServicioImpl implements EmpresaServicio {
         return mapearARespuesta(empresaAprobada);
     }
 
-    // --- El resto de tus métodos CRUD que ya estaban bien ---
+    // RESTO DE METODOS CRUD
 
     @Override
     public List<RespuestaEmpresa> listarTodas() {

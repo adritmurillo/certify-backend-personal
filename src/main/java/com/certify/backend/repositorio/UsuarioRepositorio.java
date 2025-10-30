@@ -15,17 +15,6 @@ import java.util.Optional;
  */
 @Repository
 public interface UsuarioRepositorio extends JpaRepository<Usuario, Integer> {
-
-    /**
-     * Busca un usuario por su correo electrónico.
-     *
-     * Este método es utilizado principalmente por el servicio
-     * de autenticación para cargar los datos del usuario
-     * durante el proceso de inicio de sesión (login).
-     *
-     * @param correo correo electrónico del usuario.
-     * @return un Optional que contiene el usuario si existe, o vacío si no se encuentra.
-     */
     Optional<Usuario> findByCorreo(String correo);
     Optional<Usuario> findByEmpresa(Empresa empresa);
 }
