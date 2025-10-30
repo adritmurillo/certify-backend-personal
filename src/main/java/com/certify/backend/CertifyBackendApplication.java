@@ -14,8 +14,7 @@ import java.util.List;
  * Clase principal del backend de Certify.
  *
  * Inicia la aplicación Spring Boot y configura la creación automática
- * de datos de prueba al iniciar, como el rol ADMIN, estados base
- * ("Activa", "Inactiva") y un usuario superadministrador.
+ * de datos de prueba al iniciar.
  */
 @SpringBootApplication
 public class CertifyBackendApplication {
@@ -32,7 +31,8 @@ public class CertifyBackendApplication {
             EstadoRegistroRepositorio estadoRegistroRepositorio,
             TipoDocumentoRepositorio tipoDocumentoRepositorio,
             EmpresaRepositorio empresaRepositorio,
-            EventoCursoRepositorio eventoCursoRepositorio, // <-- 1. INYECTA EL NUEVO REPOSITORIO
+            // Manteniendo la inyección que necesitas
+            EventoCursoRepositorio eventoCursoRepositorio,
             PasswordEncoder passwordEncoder
     ) {
         return args -> {
@@ -44,11 +44,13 @@ public class CertifyBackendApplication {
                 Rol rolAdminEmpresa = Rol.builder().nombre("Admin Empresa").build();
                 rolRepositorio.saveAll(List.of(rolAdmin, rolAdminEmpresa));
 
+                // --- SECCIÓN CORREGIDA: Integrando los 4 estados ---
                 EstadoRegistro estadoActivo = EstadoRegistro.builder().nombre("Activa").build();
-                EstadoRegistro estadoInactivo = EstadoRegistro.builder().nombre("Inactivo").build();
                 EstadoRegistro estadoPendiente = EstadoRegistro.builder().nombre("Pendiente").build();
-
-                estadoRegistroRepositorio.saveAll(List.of(estadoActivo, estadoInactivo, estadoPendiente));
+                EstadoRegistro estadoRechazado = EstadoRegistro.builder().nombre("Rechazado").build();
+                EstadoRegistro estadoArchivado = EstadoRegistro.builder().nombre("Archivado").build();
+                estadoRegistroRepositorio.saveAll(List.of(estadoActivo, estadoPendiente, estadoRechazado, estadoArchivado));
+                // --- FIN DE LA CORRECCIÓN ---
 
                 TipoDocumento tipoDNI = TipoDocumento.builder().descripcion("DNI").build();
                 tipoDocumentoRepositorio.save(tipoDNI);
@@ -68,7 +70,8 @@ public class CertifyBackendApplication {
                 usuarioRepositorio.save(usuarioEmpresa);
                 System.out.println("✅ Usuario Admin Empresa de prueba creado: empresa@certify.com / 123456");
 
-                // --- 4. CREAR ÁREAS/PROYECTOS DE PRUEBA (EVENTO CURSO) ---  <-- 2. AGREGA ESTE BLOQUE
+                // --- 4. CREAR ÁREAS/PROYECTOS DE PRUEBA (EVENTO CURSO) ---
+                // Se mantiene tu bloque de código intacto
                 System.out.println("Creando Áreas/Proyectos de prueba...");
                 EventoCurso dev = EventoCurso.builder().nombre("Desarrollo de Software").estado(estadoActivo).empresa(empresaPrueba).creadoPor(usuarioEmpresa).build();
                 EventoCurso it = EventoCurso.builder().nombre("Soporte de TI").estado(estadoActivo).empresa(empresaPrueba).creadoPor(usuarioEmpresa).build();
@@ -79,5 +82,4 @@ public class CertifyBackendApplication {
             }
         };
     }
-
 }

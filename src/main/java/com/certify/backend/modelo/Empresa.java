@@ -43,6 +43,10 @@ public class Empresa {
     @JoinColumn(name = "estado_id")
     private EstadoRegistro estado;
 
+    // --- NUEVO CAMPO PARA MOTIVO DE RECHAZO ---
+    @Column(name = "motivo_rechazo", columnDefinition = "TEXT")
+    private String motivoRechazo;
+
     /** Usuario que registró la empresa. */
     @ManyToOne
     @JoinColumn(name = "creado_por_usuario_id", nullable = true)

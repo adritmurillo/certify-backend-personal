@@ -4,19 +4,19 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.security.authentication.AuthenticationProvider;
+// --- AÑADIR ESTE IMPORT ---
+import org.springframework.security.config.annotation.method.configuration.EnableMethodSecurity;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
 import org.springframework.security.config.http.SessionCreationPolicy;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
 
-/**
- * Configuración principal de seguridad HTTP.
- * Define qué rutas son públicas, la política de sesión (sin estado) y el uso del filtro JWT.
- */
 @Configuration
 @EnableWebSecurity
 @RequiredArgsConstructor
+// --- AÑADIR ESTA ANOTACIÓN ---
+@EnableMethodSecurity
 public class ConfiguracionSeguridad {
 
     private final FiltroJwt filtroJwt;

@@ -12,6 +12,8 @@ public interface EmpresaServicio {
 
     RespuestaEmpresa aprobarSolicitud(Integer empresaId);
 
+    RespuestaEmpresa rechazarSolicitud(Integer empresaId, String motivo);
+
     List<RespuestaEmpresa> listarTodas();
 
     // PARA UN CRUD MAS COMPLETO AGREGARE ESTOS NUEVOS METODOS
@@ -29,9 +31,13 @@ public interface EmpresaServicio {
     // el RUC que es inmutable, el admin solo puede actualizar su propia empresa
     RespuestaEmpresa actualizarEmpresa(Integer empresaId, PeticionActualizarEmpresa peticion);
 
-    //Cambia el estado de una empresa (ACTIVA, INACTIVA, PENDIENTE)
+    //Cambia el estado de una empresa (ACTIVA, RECHAZADA, PENDIENTE)
     RespuestaEmpresa cambiarEstado(Integer empresaId, String nuevoEstado);
 
-    //Elimina una empresa por su ID, soft delete: cambia estado a "Inactivo"
+    //Este es un softdelete, en realidad se archiva la empresa
     void eliminarEmpresa(Integer empresaId);
+
+    void actualizarCorreoAdmin(Integer empresaId, String nuevoCorreo);
+
+    void eliminarSolicitudRechazada(Integer empresaId);
 }

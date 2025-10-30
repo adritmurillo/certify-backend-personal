@@ -1,6 +1,8 @@
 package com.certify.backend.controlador;
 
+import com.certify.backend.dto.PeticionActualizarCorreoAdmin;
 import com.certify.backend.dto.PeticionActualizarEmpresa;
+import com.certify.backend.dto.PeticionRechazarSolicitud;
 import com.certify.backend.dto.RespuestaEmpresa;
 import com.certify.backend.servicio.EmpresaServicio;
 import jakarta.validation.Valid;
@@ -28,9 +30,33 @@ public class EmpresaControlador {
         return ResponseEntity.ok(empresaAprobada);
     }
 
+    // RECHAZAR LA SOLICITUD DE REGISTRO DE EMPRESA
+    @PatchMapping("/{empresaId}/rechazar")
+    @PreAuthorize("hasAuthority('ADMIN')")
+    public ResponseEntity<RespuestaEmpresa> rechazarEmpresa(
+            @PathVariable Integer empresaId,
+            @Valid @RequestBody PeticionRechazarSolicitud peticion
+    ) {
+        RespuestaEmpresa empresaRechazada = empresaServicio.rechazarSolicitud(empresaId, peticion.getMotivo());
+        return ResponseEntity.ok(empresaRechazada);
+    }
+
+    // ENDPOINT PARA RECUPERAR EL CORREO DE ADMIN DE LA EMPRESA Y ACTUALIZARLO
+
+    @PatchMapping("/{empresaId}/actualizar-correo-admin")
+    @PreAuthorize("hasAuthority('ADMIN')")
+    public ResponseEntity<Void> actualizarCorreoAdmin(
+            @PathVariable Integer empresaId,
+            @Valid @RequestBody PeticionActualizarCorreoAdmin peticion
+    ) {
+        empresaServicio.actualizarCorreoAdmin(empresaId, peticion.getNuevoCorreo());
+        return ResponseEntity.noContent().build();
+    }
+
+
     // MAS ENDPOINTS PARA UN CRUD MAS COMPLETO
 
-    // Eliminar empresa, soft delete
+    // Eliminar empresa, soft delete (AHORA ARCHIVAR)
     @DeleteMapping("/{empresaId}")
     @PreAuthorize("hasAuthority('ADMIN')")
     public ResponseEntity<Void> eliminarEmpresa(@PathVariable Integer empresaId) {
@@ -38,8 +64,15 @@ public class EmpresaControlador {
         return ResponseEntity.noContent().build();
     }
 
-    // UPDATE PARA CAMBIAR DE ESTADO
+    // --- AÑADIR ESTE NUEVO ENDPOINT PARA EL HARD DELETE ---
+    @DeleteMapping("/{empresaId}/permanente")
+    @PreAuthorize("hasAuthority('ADMIN')")
+    public ResponseEntity<Void> eliminarSolicitudPermanentemente(@PathVariable Integer empresaId) {
+        empresaServicio.eliminarSolicitudRechazada(empresaId);
+        return ResponseEntity.noContent().build();
+    }
 
+    // UPDATE PARA CAMBIAR DE ESTADO
     @PatchMapping("/{empresaId}/estado")
     @PreAuthorize("hasAuthority('ADMIN')")
     public ResponseEntity<RespuestaEmpresa> cambiarEstado(

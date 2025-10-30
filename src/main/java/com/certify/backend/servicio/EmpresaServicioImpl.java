@@ -14,6 +14,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
+import java.util.Optional; // Asegúrate de importar Optional
 
 @Service
 @RequiredArgsConstructor
@@ -30,16 +31,77 @@ public class EmpresaServicioImpl implements EmpresaServicio {
     @Override
     @Transactional
     public RespuestaEmpresa solicitarRegistro(PeticionSolicitudEmpresa peticion) {
-        System.out.println("\n--- DEBUG: Iniciando solicitarRegistro ---");
-        // ... (Validaciones de RUC y correo se mantienen)
-        empresaRepositorio.findByRuc(peticion.getRuc()).ifPresent(e -> {
-            throw new IllegalArgumentException("Ya existe una empresa con el RUC: " + peticion.getRuc());
-        });
+        System.out.println("\n--- DEBUG: Iniciando solicitarRegistro para RUC: " + peticion.getRuc() + " ---");
+
+        // --- PASO 1: Buscar por RUC ---
+        Optional<Empresa> empresaExistenteOpt = empresaRepositorio.findByRuc(peticion.getRuc());
+
+        // --- PASO 2: Si el RUC existe, manejar los diferentes estados ---
+        if (empresaExistenteOpt.isPresent()) {
+            Empresa empresa = empresaExistenteOpt.get();
+            String estadoActual = empresa.getEstado().getNombre();
+
+            switch (estadoActual) {
+                case "Rechazado":
+                    // --- CASO A: Lógica de Reactivación (Empresa Rechazada) ---
+                    System.out.println("DEBUG: RUC encontrado con estado 'Rechazado'. Iniciando reactivación.");
+
+                    // Obtener el usuario admin de esta empresa
+                    Usuario adminUsuario = empresa.getUsuarios().stream()
+                            .filter(u -> "Admin Empresa".equals(u.getRol().getNombre()))
+                            .findFirst()
+                            .orElseThrow(() -> new IllegalStateException("Error crítico: Empresa rechazada no tiene usuario admin. ID: " + empresa.getEmpresaId()));
+
+                    // --- Validación de Correo (el "Agujero de Seguridad") ---
+                    Optional<Usuario> correoExistenteOpt = usuarioRepositorio.findByCorreo(peticion.getCorreoAdmin());
+                    if (correoExistenteOpt.isPresent() && !correoExistenteOpt.get().getUsuarioId().equals(adminUsuario.getUsuarioId())) {
+                        // El correo existe y NO pertenece a este usuario.
+                        throw new IllegalArgumentException("El correo " + peticion.getCorreoAdmin() + " ya está en uso por otro usuario.");
+                    }
+                    // --- Fin de Validación de Correo ---
+
+                    EstadoRegistro estadoPendiente = estadoRegistroRepositorio.findByNombre("Pendiente")
+                            .orElseThrow(() -> new RuntimeException("Error: Estado 'Pendiente' no encontrado."));
+
+                    // Actualizar datos de la Empresa
+                    empresa.setRazonSocial(peticion.getRazonSocial());
+                    empresa.setCorreoContacto(peticion.getCorreoContacto());
+                    empresa.setEstado(estadoPendiente);
+                    empresa.setMotivoRechazo(null); // Limpiar motivo anterior
+
+                    // Actualizar datos del Usuario y Persona
+                    adminUsuario.setCorreo(peticion.getCorreoAdmin());
+                    Persona adminPersona = adminUsuario.getPersona();
+                    adminPersona.setNombres(peticion.getNombresAdmin());
+                    adminPersona.setApellidos(peticion.getApellidosAdmin());
+                    adminPersona.setDocumento(peticion.getDocumentoAdmin());
+
+                    System.out.println("DEBUG: Datos actualizados. Guardando empresa ID: " + empresa.getEmpresaId());
+                    Empresa empresaActualizada = empresaRepositorio.save(empresa);
+                    return mapearARespuesta(empresaActualizada);
+
+                case "Activa":
+                case "Pendiente":
+                    // --- CASO B: Bloquear si ya está activa o pendiente ---
+                    System.err.println("DEBUG: RUC encontrado con estado '" + estadoActual + "'. Solicitud bloqueada.");
+                    throw new IllegalArgumentException("Ya existe una empresa activa o pendiente con el RUC: " + peticion.getRuc());
+
+                default:
+                    // --- CASO C: Manejar otros estados (ej. "Archivado") ---
+                    System.err.println("DEBUG: RUC encontrado con estado '" + estadoActual + "'. Solicitud bloqueada.");
+                    throw new IllegalStateException("El estado de la empresa (" + estadoActual + ") no permite una nueva solicitud.");
+            }
+        }
+
+        // --- PASO 3: Si el RUC no existe, es un registro nuevo ---
+        System.out.println("DEBUG: RUC no encontrado. Procediendo con nuevo registro.");
+
+        // Validar que el correo del nuevo admin no exista
         usuarioRepositorio.findByCorreo(peticion.getCorreoAdmin()).ifPresent(u -> {
             throw new IllegalArgumentException("Ya existe un usuario con el correo: " + peticion.getCorreoAdmin());
         });
 
-        // ... (Obtención de entidades base se mantiene)
+        // Obtener entidades base
         EstadoRegistro estadoPendiente = estadoRegistroRepositorio.findByNombre("Pendiente")
                 .orElseThrow(() -> new RuntimeException("Error: Estado 'Pendiente' no encontrado."));
         Rol rolAdminEmpresa = rolRepositorio.findByNombre("Admin Empresa")
@@ -47,6 +109,7 @@ public class EmpresaServicioImpl implements EmpresaServicio {
         TipoDocumento tipoDNI = tipoDocumentoRepositorio.findByDescripcion("DNI")
                 .orElseThrow(() -> new RuntimeException("Error: Tipo de documento 'DNI' no encontrado."));
 
+        // Lógica de creación original
         Empresa nuevaEmpresa = Empresa.builder()
                 .ruc(peticion.getRuc())
                 .razonSocial(peticion.getRazonSocial())
@@ -67,24 +130,16 @@ public class EmpresaServicioImpl implements EmpresaServicio {
                 .rol(rolAdminEmpresa)
                 .empresa(nuevaEmpresa)
                 .build();
-        System.out.println("DEBUG: Creado objeto Empresa en memoria: " + nuevaEmpresa.getRazonSocial());
-        System.out.println("DEBUG: Creado objeto Usuario en memoria: " + adminUsuario.getCorreo());
-        System.out.println("DEBUG: Asignando usuario a la empresa...");
+
         nuevaEmpresa.setUsuarios(List.of(adminUsuario));
 
-        // Verificamos la relación antes de guardar
-        if (nuevaEmpresa.getUsuarios() != null && !nuevaEmpresa.getUsuarios().isEmpty()) {
-            System.out.println("DEBUG: ¡ÉXITO! La lista de usuarios en la empresa NO está vacía. Contiene: " + nuevaEmpresa.getUsuarios().get(0).getCorreo());
-        } else {
-            System.err.println("DEBUG: ¡ERROR! La lista de usuarios en la empresa ESTÁ vacía ANTES de guardar.");
-        }
-
-        System.out.println("DEBUG: Guardando la empresa en la base de datos...");
+        System.out.println("DEBUG: Guardando nueva empresa...");
         Empresa empresaGuardada = empresaRepositorio.save(nuevaEmpresa);
-        System.out.println("--- DEBUG: Finalizado solicitarRegistro para empresa ID: " + empresaGuardada.getEmpresaId() + " ---\n");
+        System.out.println("--- DEBUG: Finalizado nuevo registro para empresa ID: " + empresaGuardada.getEmpresaId() + " ---\n");
 
         return mapearARespuesta(empresaGuardada);
     }
+
 
     @Override
     @Transactional
@@ -94,12 +149,9 @@ public class EmpresaServicioImpl implements EmpresaServicio {
                 .orElseThrow(() -> new RuntimeException("Empresa no encontrada con ID: " + empresaId));
         System.out.println("DEBUG: Empresa encontrada: " + empresaPendiente.getRazonSocial());
 
-        if (empresaPendiente.getUsuarios() != null && !empresaPendiente.getUsuarios().isEmpty()) {
-            System.out.println("DEBUG: ¡ÉXITO! La lista de usuarios de la empresa NO está vacía. Contiene " + empresaPendiente.getUsuarios().size() + " usuario(s).");
-            System.out.println("DEBUG: Usuario en la lista: " + empresaPendiente.getUsuarios().get(0).getCorreo());
-        } else {
-            // Si ves este mensaje, es porque hay un problema
+        if (empresaPendiente.getUsuarios() == null || empresaPendiente.getUsuarios().isEmpty()) {
             System.err.println("DEBUG: ¡ERROR! La lista de usuarios de la empresa ESTÁ vacía o es nula después de recuperarla de la BD.");
+            throw new IllegalStateException("Error crítico: No se encontró usuario asociado a la empresa.");
         }
 
         if (!"Pendiente".equals(empresaPendiente.getEstado().getNombre())) {
@@ -137,7 +189,41 @@ public class EmpresaServicioImpl implements EmpresaServicio {
         return mapearARespuesta(empresaAprobada);
     }
 
-    // RESTO DE METODOS CRUD
+    // --- NUEVO MÉTODO DE RECHAZO ---
+    @Override
+    @Transactional
+    public RespuestaEmpresa rechazarSolicitud(Integer empresaId, String motivo) {
+        Empresa empresaPendiente = empresaRepositorio.findById(empresaId)
+                .orElseThrow(() -> new RuntimeException("Empresa no encontrada con ID: " + empresaId));
+
+        if (!"Pendiente".equals(empresaPendiente.getEstado().getNombre())) {
+            throw new IllegalStateException("Solo se pueden rechazar empresas en estado 'Pendiente'");
+        }
+
+        EstadoRegistro estadoRechazado = estadoRegistroRepositorio.findByNombre("Rechazado")
+                .orElseThrow(() -> new RuntimeException("Estado 'Rechazado' no encontrado."));
+
+        empresaPendiente.setEstado(estadoRechazado);
+        empresaPendiente.setMotivoRechazo(motivo); // Guardamos el motivo
+
+        Empresa empresaRechazada = empresaRepositorio.save(empresaPendiente);
+
+        // Notificar por correo
+        try {
+            // Asumimos que el primer usuario de la lista es el admin que solicitó el registro
+            Usuario adminSolicitante = empresaRechazada.getUsuarios().stream()
+                    .filter(u -> "Admin Empresa".equals(u.getRol().getNombre()))
+                    .findFirst()
+                    .orElseThrow(() -> new IllegalStateException("No se encontró admin para notificar rechazo."));
+
+            emailServicio.enviarNotificacionRechazo(adminSolicitante.getCorreo(), motivo);
+        } catch (Exception e) {
+            System.err.println("⚠️ Error al enviar email de rechazo: " + e.getMessage());
+        }
+
+        return mapearARespuesta(empresaRechazada);
+    }
+
 
     @Override
     public List<RespuestaEmpresa> listarTodas() {
@@ -181,7 +267,74 @@ public class EmpresaServicioImpl implements EmpresaServicio {
     @Override
     @Transactional
     public void eliminarEmpresa(Integer empresaId) {
-        cambiarEstado(empresaId, "Inactivo");
+        // Esta lógica necesita ser actualizada a "Archivado"
+        // cambiarEstado(empresaId, "Inactivo"); // <- Esta línea está rota
+
+        // --- LÓGICA DE SOFT DELETE CORRECTA ---
+        Empresa empresa = empresaRepositorio.findById(empresaId)
+                .orElseThrow(() -> new RuntimeException("Empresa no encontrada con ID: " + empresaId));
+
+        EstadoRegistro estadoArchivado = estadoRegistroRepositorio.findByNombre("Archivado")
+                .orElseThrow(() -> new RuntimeException("Estado 'Archivado' no encontrado."));
+
+        empresa.setEstado(estadoArchivado);
+        empresaRepositorio.save(empresa);
+    }
+    // METODO PARA ACTUALIZAR CORREO DEL ADMIN DE LA EMPRESA EN CASO ESTE LO HAYA PERDIDO
+    @Override
+    @Transactional
+    public void actualizarCorreoAdmin(Integer empresaId, String nuevoCorreo) {
+        // 1. Validar que el nuevo correo no esté ya en uso por otro usuario
+        usuarioRepositorio.findByCorreo(nuevoCorreo).ifPresent(u -> {
+            throw new IllegalArgumentException("El correo " + nuevoCorreo + " ya está registrado en el sistema.");
+        });
+
+        // 2. Encontrar la empresa
+        Empresa empresa = empresaRepositorio.findById(empresaId)
+                .orElseThrow(() -> new RuntimeException("Empresa no encontrada con ID: " + empresaId));
+
+        // 3. Encontrar al usuario "Admin Empresa" de esa empresa
+        Usuario adminUsuario = empresa.getUsuarios().stream()
+                .filter(u -> "Admin Empresa".equals(u.getRol().getNombre()))
+                .findFirst()
+                .orElseThrow(() -> new IllegalStateException("No se encontró un usuario administrador para la empresa con ID: " + empresaId));
+
+        // 4. Actualizar el correo
+        String correoAntiguo = adminUsuario.getCorreo();
+        adminUsuario.setCorreo(nuevoCorreo);
+        usuarioRepositorio.save(adminUsuario);
+        System.out.println("DEBUG: Correo del admin de la empresa " + empresaId + " actualizado de " + correoAntiguo + " a " + nuevoCorreo);
+
+        // 5. Reenviar credenciales (aquí generamos una nueva contraseña temporal)
+        try {
+            String nuevaContrasenaTemporal = GeneradorContrasena.generarTemporal();
+            adminUsuario.setContrasena(passwordEncoder.encode(nuevaContrasenaTemporal));
+            usuarioRepositorio.save(adminUsuario);
+
+            emailServicio.enviarCredencialesTemporales(
+                    nuevoCorreo,
+                    nuevoCorreo,
+                    nuevaContrasenaTemporal
+            );
+            System.out.println("DEBUG: Se han reenviado credenciales al nuevo correo: " + nuevoCorreo);
+        } catch (Exception e) {
+            System.err.println("⚠️ Error al reenviar credenciales: " + e.getMessage());
+        }
+    }
+
+    @Override
+    @Transactional
+    public void eliminarSolicitudRechazada(Integer empresaId) {
+        Empresa empresa = empresaRepositorio.findById(empresaId)
+                .orElseThrow(() -> new RuntimeException("Empresa no encontrada con ID: " + empresaId));
+
+        // --- ¡VALIDACIÓN DE SEGURIDAD CLAVE! ---
+        if (!"Rechazado".equals(empresa.getEstado().getNombre())) {
+            throw new IllegalStateException("Solo se pueden eliminar permanentemente las solicitudes que han sido rechazadas.");
+        }
+
+        empresaRepositorio.delete(empresa);
+        System.out.println("DEBUG: Se ha eliminado permanentemente la solicitud de la empresa con ID: " + empresaId);
     }
 
     private RespuestaEmpresa mapearARespuesta(Empresa empresa) {

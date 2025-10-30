@@ -48,4 +48,40 @@ public class EmailServicio {
             Equipo %s
             """, appNombre, correo, contrasenaTemporal, appNombre);
     }
+
+    public void enviarNotificacionRechazo(String destinatario, String motivo) {
+        SimpleMailMessage mensaje = new SimpleMailMessage();
+        mensaje.setFrom(fromEmail);
+        mensaje.setTo(destinatario);
+        mensaje.setSubject("Actualización sobre tu solicitud en " + appNombre);
+        mensaje.setText(construirMensajeRechazo(motivo));
+
+        mailSender.send(mensaje);
+    }
+
+    private String construirMensajeRechazo(String motivo) {
+        // Usamos el 'fromEmail' como correo de soporte
+        String correoSoporte = fromEmail;
+
+        return String.format("""
+            ¡Hola!
+
+            Hemos revisado tu solicitud de registro en %s.
+            
+            Lamentablemente, en esta ocasión tu solicitud no ha sido aprobada.
+            
+            Motivo del rechazo:
+            "%s"
+            
+            --------------------------------------------------------------------
+            
+            ¿Crees que esto es un error o necesitas corregir algún dato?
+            Simplemente, vuelve a la página de registro y envía tu solicitud de nuevo con la información correcta.
+            
+            Si el problema persiste, ponte en contacto con nuestro equipo de soporte a través de: %s
+            
+            Saludos,
+            Equipo %s
+            """, appNombre, motivo, correoSoporte, appNombre);
+    }
 }
