@@ -1,17 +1,21 @@
 package com.certify.backend.servicio;
 
-import com.certify.backend.dto.PeticionActualizarParticipante; // <-- NUEVO IMPORT
+import com.certify.backend.dto.PeticionActualizarParticipante;
 import com.certify.backend.dto.PeticionCrearParticipante;
 import com.certify.backend.dto.RespuestaParticipante;
 import com.certify.backend.modelo.*;
-import com.certify.backend.repositorio.*; // <-- NUEVO IMPORT
+import com.certify.backend.repositorio.*;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.jpa.domain.Specification;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.core.userdetails.UsernameNotFoundException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import jakarta.persistence.criteria.Predicate;
 
-import java.util.List; // <-- NUEVO IMPORT
+import java.time.LocalDate;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Optional;
 
 @Service
@@ -27,7 +31,6 @@ public class ParticipanteServicioImpl implements ParticipanteServicio {
     @Override
     @Transactional
     public RespuestaParticipante crearParticipante(PeticionCrearParticipante peticion) {
-
         EventoCurso evento = eventoCursoRepositorio.findById(peticion.getEventoCursoId())
                 .orElseThrow(() -> new RuntimeException("El Área/Proyecto con ID: " + peticion.getEventoCursoId() + " no existe."));
 
@@ -42,11 +45,10 @@ public class ParticipanteServicioImpl implements ParticipanteServicio {
         Usuario usuarioCreador = obtenerUsuarioAutenticado();
         Empresa empresaDelUsuario = usuarioCreador.getEmpresa();
 
-        if (empresaDelUsuario == null && !"ADMIN".equals(usuarioCreador.getRol().getNombre())) { // <-- MODIFICACIÓN LIGERA (Permite al ADMIN crear)
+        if (empresaDelUsuario == null && !"ADMIN".equals(usuarioCreador.getRol().getNombre())) {
             throw new IllegalStateException("El usuario " + usuarioCreador.getCorreo() + " no está asociado a ninguna empresa y no puede registrar participantes.");
         }
 
-        // --- MODIFICACIÓN CLAVE (1): Buscar el estado "Activa" ---
         EstadoRegistro estadoActivo = estadoRegistroRepositorio.findByNombre("Activa")
                 .orElseThrow(() -> new RuntimeException("El estado 'Activa' no fue encontrado."));
 
@@ -59,44 +61,66 @@ public class ParticipanteServicioImpl implements ParticipanteServicio {
 
         Participante nuevoParticipante = Participante.builder()
                 .persona(nuevaPersona)
-                .empresa(empresaDelUsuario) // <-- Será null si el creador es ADMIN
+                .empresa(empresaDelUsuario)
                 .eventoCurso(evento)
                 .correoAdicional(peticion.getCorreo())
                 .creadoPor(usuarioCreador)
                 .fechaInicio(peticion.getFechaInicio())
                 .fechaFin(peticion.getFechaFin())
-                .estado(estadoActivo) // <-- MODIFICACIÓN CLAVE (2): Asignar el estado
+                .estado(estadoActivo)
                 .build();
 
         Participante participanteGuardado = participanteRepositorio.save(nuevoParticipante);
-
-        // --- MODIFICACIÓN CLAVE (3): Usar el método helper ---
         return mapearARespuesta(participanteGuardado);
     }
 
-    // --- MÉTODOS NUEVOS AÑADIDOS ---
-
     @Override
     @Transactional(readOnly = true)
-    public List<RespuestaParticipante> obtenerTodosPorEmpresa() {
+    public List<RespuestaParticipante> obtenerPracticantesConFiltros(
+            String nombreODni,
+            Integer areaProyectoId,
+            LocalDate fechaInicio,
+            LocalDate fechaFin
+    ) {
         Usuario usuario = obtenerUsuarioAutenticado();
 
-        // Lógica para Superadmin (ADMIN)
-        if ("ADMIN".equals(usuario.getRol().getNombre())) {
-            return participanteRepositorio.findAllByEstado_NombreNot("Archivado")
-                    .stream()
-                    .map(this::mapearARespuesta)
-                    .toList();
-        }
+        Specification<Participante> spec = (root, query, cb) -> {
+            List<Predicate> predicates = new ArrayList<>();
 
-        // Lógica para Admin Empresa
-        if (usuario.getEmpresa() == null) {
-            return List.of(); // Admin de empresa sin empresa asignada, no debe ver nada.
-        }
-        Integer empresaId = usuario.getEmpresa().getEmpresaId();
+            if ("Admin Empresa".equals(usuario.getRol().getNombre())) {
+                if (usuario.getEmpresa() == null) {
+                    return cb.disjunction();
+                }
+                predicates.add(cb.equal(root.get("empresa").get("empresaId"), usuario.getEmpresa().getEmpresaId()));
+            }
 
-        return participanteRepositorio.findAllByEmpresa_EmpresaIdAndEstado_NombreNot(empresaId, "Archivado")
-                .stream()
+            predicates.add(cb.notEqual(root.get("estado").get("nombre"), "Archivado"));
+
+            if (nombreODni != null && !nombreODni.trim().isEmpty()) {
+                String filtroLike = "%" + nombreODni.toLowerCase() + "%";
+                Predicate pNombre = cb.like(cb.lower(root.get("persona").get("nombres")), filtroLike);
+                Predicate pApellido = cb.like(cb.lower(root.get("persona").get("apellidos")), filtroLike);
+                Predicate pDocumento = cb.like(root.get("persona").get("documento"), filtroLike);
+                predicates.add(cb.or(pNombre, pApellido, pDocumento));
+            }
+
+            if (areaProyectoId != null) {
+                predicates.add(cb.equal(root.get("eventoCurso").get("eventoCursoId"), areaProyectoId));
+            }
+
+            if (fechaInicio != null) {
+                predicates.add(cb.greaterThanOrEqualTo(root.get("fechaInicio"), fechaInicio));
+            }
+
+            if (fechaFin != null) {
+                predicates.add(cb.lessThanOrEqualTo(root.get("fechaFin"), fechaFin));
+            }
+
+            return cb.and(predicates.toArray(new Predicate[0]));
+        };
+
+        List<Participante> participantes = participanteRepositorio.findAll(spec);
+        return participantes.stream()
                 .map(this::mapearARespuesta)
                 .toList();
     }
@@ -116,7 +140,6 @@ public class ParticipanteServicioImpl implements ParticipanteServicio {
         EventoCurso evento = eventoCursoRepositorio.findById(peticion.getEventoCursoId())
                 .orElseThrow(() -> new RuntimeException("Área/Proyecto no encontrado."));
 
-        // Validar que el nuevo DNI no esté en uso por OTRO participante en el mismo curso
         participanteRepositorio.findByPersonaDocumentoAndEventoCurso(peticion.getDocumento(), evento)
                 .ifPresent(p -> {
                     if (!p.getParticipanteId().equals(id)) {
@@ -127,14 +150,12 @@ public class ParticipanteServicioImpl implements ParticipanteServicio {
         TipoDocumento tipoDocumento = tipoDocumentoRepositorio.findById(peticion.getTipoDocumentoId())
                 .orElseThrow(() -> new RuntimeException("Tipo de documento no encontrado."));
 
-        // Actualizar datos de la Persona
         Persona persona = participante.getPersona();
         persona.setNombres(peticion.getNombres());
         persona.setApellidos(peticion.getApellidos());
         persona.setDocumento(peticion.getDocumento());
         persona.setTipoDocumento(tipoDocumento);
 
-        // Actualizar datos del Participante
         participante.setCorreoAdicional(peticion.getCorreo());
         participante.setEventoCurso(evento);
         participante.setFechaInicio(peticion.getFechaInicio());
@@ -163,31 +184,25 @@ public class ParticipanteServicioImpl implements ParticipanteServicio {
         Participante participante = obtenerYValidarAcceso(id);
         EstadoRegistro estadoArchivado = estadoRegistroRepositorio.findByNombre("Archivado")
                 .orElseThrow(() -> new RuntimeException("Estado 'Archivado' no encontrado."));
-
         participante.setEstado(estadoArchivado);
         participanteRepositorio.save(participante);
     }
-
-    // --- MÉTODOS PRIVADOS DE AYUDA (HELPERS) ---
 
     private Participante obtenerYValidarAcceso(Integer participanteId) {
         Usuario usuario = obtenerUsuarioAutenticado();
         Participante participante = participanteRepositorio.findById(participanteId)
                 .orElseThrow(() -> new RuntimeException("Participante con ID " + participanteId + " no encontrado."));
 
-        // El Superadmin (rol ADMIN) tiene acceso a todo.
         if ("ADMIN".equals(usuario.getRol().getNombre())) {
             return participante;
         }
 
-        // El Admin de Empresa solo puede ver los de su empresa
         if (usuario.getEmpresa() == null || !participante.getEmpresa().getEmpresaId().equals(usuario.getEmpresa().getEmpresaId())) {
             throw new SecurityException("No tiene permiso para acceder a este participante.");
         }
         return participante;
     }
 
-    // Un solo lugar para convertir la entidad al DTO de respuesta
     private RespuestaParticipante mapearARespuesta(Participante p) {
         String periodo = (p.getFechaInicio() != null && p.getFechaFin() != null) ?
                 p.getFechaInicio().toString() + " al " + p.getFechaFin().toString() : "N/A";
@@ -210,9 +225,6 @@ public class ParticipanteServicioImpl implements ParticipanteServicio {
                 .fechaFin(p.getFechaFin())
                 .build();
     }
-
-
-    // --- El resto de tus métodos de CRUDService (pueden quedar así) ---
 
     @Override
     public Participante save(Participante entity) {

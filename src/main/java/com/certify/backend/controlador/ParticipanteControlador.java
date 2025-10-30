@@ -6,11 +6,13 @@ import com.certify.backend.dto.RespuestaParticipante;
 import com.certify.backend.servicio.ParticipanteServicio;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
+import java.time.LocalDate;
 import java.util.List;
 
 @RestController
@@ -23,19 +25,23 @@ public class ParticipanteControlador {
 
     private final ParticipanteServicio participanteServicio;
 
-    // --- CREATE (Ya lo tenías, queda igual) ---
-    // POST /api/v1/participantes
     @PostMapping
     public ResponseEntity<RespuestaParticipante> crearParticipante(@Valid @RequestBody PeticionCrearParticipante peticion) {
         RespuestaParticipante nuevoParticipante = participanteServicio.crearParticipante(peticion);
         return ResponseEntity.status(HttpStatus.CREATED).body(nuevoParticipante);
     }
 
-    // --- READ (Listar todos los practicantes no archivados) ---
-    // GET /api/v1/participantes
     @GetMapping
-    public ResponseEntity<List<RespuestaParticipante>> obtenerTodos() {
-        List<RespuestaParticipante> participantes = participanteServicio.obtenerTodosPorEmpresa();
+    public ResponseEntity<List<RespuestaParticipante>> obtenerTodos(
+            @RequestParam(required = false) String nombreODni,
+            @RequestParam(required = false) Integer areaProyectoId,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate fechaInicio,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate fechaFin
+    ) {
+
+        List<RespuestaParticipante> participantes = participanteServicio.obtenerPracticantesConFiltros(
+                nombreODni, areaProyectoId, fechaInicio, fechaFin
+        );
         return ResponseEntity.ok(participantes);
     }
 
