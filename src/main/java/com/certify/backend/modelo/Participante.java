@@ -36,6 +36,10 @@ public class Participante {
 
     // Aca abajo tenemos a las relaciones con otras entidades
 
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "estado_id", nullable = false)
+    private EstadoRegistro estado;
+
     @ManyToOne
     @JoinColumn(name = "empresa_id", nullable = false)
     private Empresa empresa;

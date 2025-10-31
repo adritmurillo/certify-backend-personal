@@ -46,11 +46,12 @@ public class CertifyBackendApplication {
 
                 // --- SECCIÓN CORREGIDA: Integrando los 4 estados ---
                 EstadoRegistro estadoActivo = EstadoRegistro.builder().nombre("Activa").build();
+                EstadoRegistro estadoInactivo = EstadoRegistro.builder().nombre("Inactivo").build();
                 EstadoRegistro estadoPendiente = EstadoRegistro.builder().nombre("Pendiente").build();
                 EstadoRegistro estadoRechazado = EstadoRegistro.builder().nombre("Rechazado").build();
                 EstadoRegistro estadoArchivado = EstadoRegistro.builder().nombre("Archivado").build();
-                estadoRegistroRepositorio.saveAll(List.of(estadoActivo, estadoPendiente, estadoRechazado, estadoArchivado));
-                // --- FIN DE LA CORRECCIÓN ---
+                estadoRegistroRepositorio.saveAll(List.of(estadoActivo, estadoInactivo, estadoPendiente, estadoRechazado, estadoArchivado));
+
 
                 TipoDocumento tipoDNI = TipoDocumento.builder().descripcion("DNI").build();
                 tipoDocumentoRepositorio.save(tipoDNI);
