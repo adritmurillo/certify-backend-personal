@@ -338,6 +338,12 @@ public class EmpresaServicioImpl implements EmpresaServicio {
     }
 
     private RespuestaEmpresa mapearARespuesta(Empresa empresa) {
+        // Busca el usuario admin dentro de la lista de usuarios de la empresa
+        Usuario admin = empresa.getUsuarios().stream()
+                .filter(u -> "Admin Empresa".equals(u.getRol().getNombre()))
+                .findFirst()
+                .orElse(null); // Maneja el caso donde no haya admin
+
         return RespuestaEmpresa.builder()
                 .empresaId(empresa.getEmpresaId())
                 .ruc(empresa.getRuc())
@@ -346,6 +352,11 @@ public class EmpresaServicioImpl implements EmpresaServicio {
                 .logoUrl(empresa.getLogoUrl())
                 .estadoNombre(empresa.getEstado() != null ? empresa.getEstado().getNombre() : "N/A")
                 .fechaCreacion(empresa.getFechaCreacion())
+                // --- AÑADIR ESTO ---
+                .adminNombres(admin != null ? admin.getPersona().getNombres() : "N/D")
+                .adminApellidos(admin != null ? admin.getPersona().getApellidos() : "N/D")
+                .adminCorreo(admin != null ? admin.getCorreo() : "N/D")
+                // --- FIN ---
                 .build();
     }
 }

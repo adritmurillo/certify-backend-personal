@@ -3,7 +3,7 @@ spring.datasource.url=jdbc:postgresql://localhost:5432/db_certify_v1
 spring.datasource.username=postgres
 spring.datasource.password=root
 
-spring.jpa.hibernate.ddl-auto=create-drop
+spring.jpa.hibernate.ddl-auto=update
 
 jwt.secret.key=MHJvL1BzbTFTK0xGQ1lmM04rWDBMZ1ZyaFYvclphV2VEcTEzcAo=
 
@@ -14,5 +14,6 @@ spring.mail.password=ejqe kado ztnr fdva
 spring.mail.properties.mail.smtp.auth=true
 spring.mail.properties.mail.smtp.starttls.enable=true
 
+# Configuración de la app
 app.base-url=http://localhost:5173
 app.nombre=CERTIFY

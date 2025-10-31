@@ -102,7 +102,7 @@ public class EmpresaControlador {
     // ADMIN EMPRESA SOLO PUEDE VER SU PROPIA EMPRESA
 
     @GetMapping
-    @PreAuthorize("hasAnyAuthority('ADMIN', 'Admin Empresa')")
+//    @PreAuthorize("hasAnyAuthority('ADMIN', 'Admin Empresa')")
     public ResponseEntity<List<RespuestaEmpresa>> listarEmpresas(
             @RequestParam(required = false) String nombre,
             @RequestParam(required = false) String estado

@@ -17,4 +17,8 @@ public class RespuestaEmpresa {
     private String logoUrl;         // URL del logotipo
     private String estadoNombre;    // Estado: "Activa" o "Inactiva"
     private Timestamp fechaCreacion; // Fecha y hora de creación
+
+    private String adminNombres;
+    private String adminApellidos;
+    private String adminCorreo;
 }
